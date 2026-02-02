@@ -1,4 +1,12 @@
 /**************************************************************************************\
+ * This is a patched version of the Lisa Emulator glue.c file from @alexthecat which   *
+ * resolves issues for mouse scaling and OS detection.                                 *
+ *                                                                                     *
+ * https://github.com/alexthecat123/LisaSourceCompilation/blob/main/glue.c             *
+\**************************************************************************************/
+
+
+/**************************************************************************************\
 *                                                                                      *
 *              The Lisa Emulator Project  V1.2.7      DEV 2007.12.04                   *
 *                             http://lisaem.sunder.net                                 *
@@ -288,6 +296,7 @@ uint8 cmp_screen_hash(uint8 *hashtable1, uint8 *hashtable2)
 #define LISA_XENIX_RUNNING 5
 #define LISA_UNIPLUS_RUNNING 6
 #define LISA_UNIPLUS_SUNIX_RUNNING 7
+#define LISA_SMALLTALK_RUNNING 8
 #define UNKNOWN_OS_RUNNING 100
 
 // remove me
@@ -360,27 +369,15 @@ int check_running_lisa_os(void)
     DEBUG_LOG(0, "LisaTest v1:%08x v2:%08x", v1, v2);
     return running_lisa_os;
   }
-  else if ((v1 & 0x000ff000) == 0x000e3000 && (v2 & 0x000ff000) == 0x000e3000) // Lisa Monitor v11.0 - v1=000e32e6 v2=000e3330, Lisa Monitor v11.1 - v1=000e32e6 v2=000e3330
+  else if (
+    ((v1 & 0x000ff000) == 0x000e3000 && (v2 & 0x000ff000) == 0x000e3000) ||  // Lisa Monitor v11.0 - v1=000e32e6 v2=000e3330, Lisa Monitor v11.1 - v1=000e32e6 v2=000e3330
+    ((v1 & 0x000ff000) == 0x000e2000 && (v2 & 0x000ff000) == 0x000e2000))    // Lisa Monitor v11.8 - v1=000e2980 v2=000e2ad2
   {
-    // Note: This setting fixes the mouse pointer in Smalltalk-80 when running it in Lisa Monitor v11.0 or v11.1
-  
-    // Note: There is also Lisa Monitor v11.2, but we could not find floppy disk images
-    // of it on the webs, hence it is unclear if it will work with the settings below.
-    lisa_os_mouse_x_ptr = 0x000010e6;
-    lisa_os_mouse_y_ptr = 0x000010e8;
-    running_lisa_os = LISA_MONITOR_RUNNING;
-    DEBUG_LOG(0, "Lisa Monitor v11.0 or v11.1 Running: v1=%08x v2=%08x", v1, v2);
-    if (monitor_patch)
-      apply_monitor_hle_patches();
-    return running_lisa_os;
-  }
-  else if ((v1 & 0x00ffffff) == 0x000e2980 && (v2 & 0x00ffffff) == 0x000e2ad2) // Lisa Monitor v11.8 - v1=000e2980 v2=000e2ad2  
-  {
-    // Note: This setting fixes the mouse pointer in Smalltalk-80 when running it in Lisa Monitor v11.8
+    // if (lisa_os_mouse_x_ptr!=0x00000fec) ALERT_LOG(0,"Mouse vector changed from %08x,%08x to fec",lisa_os_mouse_x_ptr,lisa_os_mouse_y_ptr);
     lisa_os_mouse_x_ptr = 0x000010ea;
     lisa_os_mouse_y_ptr = 0x000010ec;
     running_lisa_os = LISA_MONITOR_RUNNING;
-    DEBUG_LOG(0, "Lisa Monitor v11.8 Running: v1=%08x v2=%08x", v1, v2);
+    DEBUG_LOG(0, "Lisa Monitor v11 Running: v1=%08x v2=%08x", v1, v2);
     if (monitor_patch)
       apply_monitor_hle_patches();
     return running_lisa_os;
@@ -449,8 +446,14 @@ int check_running_lisa_os(void)
     return running_lisa_os;
   }
   // src/lisa/motherboard/glue.c:check_running_lisa_os:382:Unknown OS Running: v1=0001c4ac v2=0001c4b0| 20:10:38.8 441279005
-
-  abort_opcode = 2;
+  lisa_os_mouse_x_ptr = 0x00cc00f0; 
+  lisa_os_mouse_y_ptr = 0x00cc00f2; 
+  mouse_x_tolerance = 4;
+  mouse_y_tolerance = 4;
+  running_lisa_os = LISA_OFFICE_RUNNING;
+  DEBUG_LOG(0, "ALEX CUSTOM LOS 2.x or 3.x : v1:%08x v2:%08x", v1, v2);
+  return running_lisa_os;
+  /*abort_opcode = 2;  COMMENTED OUT BY ALEX
   uint32 test1 = fetchlong(0x400040);
   abort_opcode = 0;
   abort_opcode = 2;
@@ -462,7 +465,7 @@ int check_running_lisa_os(void)
 
   running_lisa_os = UNKNOWN_OS_RUNNING;
   ALERT_LOG(0, "Unknown OS Running: v1=%08x v2=%08x; test1,2,3: %08x, %08x, %08x", v1, v2, test1, test2, test3);
-  return running_lisa_os;
+  return running_lisa_os;*/
 }
 
 ///////////// REPLACE THESE!!!!!!!!!!!!!!! /////////////////////////
